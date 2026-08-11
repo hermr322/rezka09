@@ -61,6 +61,29 @@
         return headers;
     }
 
+    function networkRequest(url, type, data, headers, onSuccess, onError) {
+        var options = {
+            headers: headers
+        };
+        if (typeof Lampa !== 'undefined' && typeof Lampa.Reguest === 'function') {
+            var net = new Lampa.Reguest();
+            if (type === 'POST') {
+                net.silent(url, onSuccess, onError, data, options);
+            } else {
+                net.silent(url, onSuccess, onError, false, options);
+            }
+        } else {
+            $.ajax({
+                url: url,
+                type: type,
+                data: data,
+                headers: headers,
+                success: onSuccess,
+                error: onError
+            });
+        }
+    }
+
     // --- Bookmarks Logic ---
     function createHDRezkaFavsComponent() {
         var component = function (object) {
@@ -73,22 +96,16 @@
                 this.activity.loader(true);
                 var url = buildRequestUrl('/favorites/');
 
-                $.ajax({
-                    url: url,
-                    type: 'GET',
-                    xhrFields: {
-                        withCredentials: true
-                    },
-                    headers: getHeaders(),
-                    success: function (result) {
+                networkRequest(url, 'GET', null, getHeaders(), 
+                    function (result) {
                         this.parseHTML(result);
                         this.build();
                     }.bind(this),
-                    error: function (jqXHR) {
-                        Lampa.Noty.show('Ошибка закладок. Код: ' + (jqXHR.status || 'CORS/Сетевая'));
+                    function (jqXHR) {
+                        Lampa.Noty.show('Ошибка загрузки. Код: ' + (jqXHR && jqXHR.status ? jqXHR.status : 'CORS/Сетевая'));
                         this.empty();
                     }.bind(this)
-                });
+                );
 
                 return this.render();
             };
@@ -251,14 +268,8 @@
             var searchUrl = buildRequestUrl('/index.php?do=search&subaction=search&q=' + encodeURIComponent(title));
             
             Lampa.Noty.show('Поиск на HDRezka: ' + title);
-        $.ajax({
-            url: searchUrl,
-            type: 'GET',
-            xhrFields: {
-                withCredentials: true
-            },
-            headers: getHeaders(),
-            success: function(html) {
+        networkRequest(searchUrl, 'GET', null, getHeaders(), 
+            function(html) {
                 try {
                     var parser = new DOMParser();
                     var doc = parser.parseFromString(html, 'text/html');
@@ -290,10 +301,10 @@
                     Lampa.Noty.show('Ошибка поиска: ' + e.message);
                 }
             },
-            error: function(jqXHR) {
-                Lampa.Noty.show('Ошибка поиска. Код: ' + (jqXHR.status || 'CORS/Сетевая'));
+            function(jqXHR) {
+                Lampa.Noty.show('Ошибка поиска. Код: ' + (jqXHR && jqXHR.status ? jqXHR.status : 'CORS/Сетевая'));
             }
-        });
+        );
         } catch (err) {
             Lampa.Noty.show('Ошибка поиска (общ): ' + err.message);
         }
@@ -302,14 +313,8 @@
     function loadMoviePage(href, movie) {
         Lampa.Noty.show('Загрузка данных...');
         var url = buildRequestUrl(href);
-        $.ajax({
-            url: url,
-            type: 'GET',
-            xhrFields: {
-                withCredentials: true
-            },
-            headers: getHeaders(),
-            success: function(html) {
+        networkRequest(url, 'GET', null, getHeaders(), 
+            function(html) {
                 try {
                     var matchId = html.match(/id="post_id"\s*name="post_id"\s*value="(\d+)"/);
                     var postId = matchId ? matchId[1] : null;
@@ -360,10 +365,10 @@
                     Lampa.Noty.show('Ошибка стр. фильма: ' + e.message);
                 }
             },
-            error: function(jqXHR) {
-                Lampa.Noty.show('Ошибка страницы. Код: ' + (jqXHR.status || 'CORS/Сетевая'));
+            function(jqXHR) {
+                Lampa.Noty.show('Ошибка получения ID. Код: ' + (jqXHR && jqXHR.status ? jqXHR.status : 'CORS/Сетевая'));
             }
-        });
+        );
     }
 
     function loadSeries(postId, translatorId, movie, trashList) {
@@ -378,17 +383,8 @@
 
         var data = 'id=' + postId + '&translator_id=' + translatorId + '&action=get_episodes';
         
-        // Use jquery ajax because Lampa.network.request POST with forms via simple API can be tricky
-        // But Lampa.network supports POST.
-        $.ajax({
-            url: apiUrl,
-            type: 'POST',
-            xhrFields: {
-                withCredentials: true
-            },
-            data: data,
-            headers: getHeaders(),
-            success: function (res) {
+        networkRequest(apiUrl, 'POST', data, getHeaders(), 
+            function (res) {
                 var html = res.episodes || res; // depending on response format
                 var parser = new DOMParser();
                 var doc = parser.parseFromString(html, 'text/html');
@@ -431,10 +427,10 @@
                     Lampa.Noty.show('Сезоны не найдены');
                 }
             },
-            error: function (jqXHR) {
-                Lampa.Noty.show('Ошибка эпизодов. Код: ' + (jqXHR.status || 'CORS/Сетевая'));
+            function (jqXHR) {
+                Lampa.Noty.show('Ошибка загрузки переводов. Код: ' + (jqXHR && jqXHR.status ? jqXHR.status : 'CORS/Сетевая'));
             }
-        });
+        );
     }
 
     function fetchStream(postId, translatorId, season, episode, movie, trashList) {
@@ -455,15 +451,8 @@
             data += '&season=' + season + '&episode=' + episode;
         }
 
-        $.ajax({
-            url: apiUrl,
-            type: 'POST',
-            xhrFields: {
-                withCredentials: true
-            },
-            data: data,
-            headers: getHeaders(),
-            success: function (res) {
+        networkRequest(apiUrl, 'POST', data, getHeaders(), 
+            function (res) {
                 if (res && res.url) {
                     var decoded = decodeUrl(res.url, trashList);
                     var streams = parseStreams(decoded);
