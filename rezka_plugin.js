@@ -467,13 +467,26 @@
     if (window.Lampa) {
         Lampa.Listener.follow('full', function (e) {
             if (e.type === 'complite') {
-                var btn = $('<div class="full-start__button selector button--hdrezka" style="background-color: #d12e2e;"><div class="full-start__button-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div><div class="full-start__button-text">Смотреть (HDRezka)</div></div>');
+                var btn = $('<div class="full-start__button selector button--hdrezka" style="background-color: #d12e2e; border-radius: 30px; display: inline-flex; align-items: center; justify-content: center; padding: 10px 20px; margin: 10px 10px 10px 0;"><div class="full-start__button-icon" style="margin-right: 10px; width: 24px; height: 24px;"><svg viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div><div class="full-start__button-text" style="color: white; font-weight: bold;">Смотреть (HDRezka)</div></div>');
                 btn.on('hover:enter', function () {
                     openRezkaBalancer(e.data.movie);
                 });
-                var buttonsContainer = e.object.activity.render().find('.full-start__buttons');
-                if (buttonsContainer.length) {
-                    buttonsContainer.append(btn);
+                
+                var render = e.object.activity.render();
+                
+                // Try finding the play button first
+                var playBtn = render.find('.button--play, [data-action="play"]');
+                if (playBtn.length) {
+                    playBtn.after(btn);
+                } else {
+                    // Fallback to various known button containers
+                    var buttonsContainer = render.find('.full-start__buttons, .view--actions, .view__actions, .info__buttons, .buttons__row');
+                    if (buttonsContainer.length) {
+                        buttonsContainer.append(btn);
+                    } else {
+                        // Last resort fallback
+                        render.find('.full-start__info').append(btn);
+                    }
                 }
             }
         });
