@@ -245,7 +245,7 @@
             var title = movie.original_title || movie.title || movie.original_name || movie.name;
             var releaseDate = movie.release_date || movie.first_air_date;
             var year = releaseDate ? releaseDate.substring(0, 4) : '';
-            var searchUrl = buildRequestUrl('/search/?do=search&subaction=search&q=' + encodeURIComponent(title));
+            var searchUrl = buildRequestUrl('/index.php?do=search&subaction=search&q=' + encodeURIComponent(title));
             
             Lampa.Noty.show('Поиск на HDRezka: ' + title);
 
