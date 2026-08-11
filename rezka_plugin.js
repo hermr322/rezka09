@@ -70,6 +70,28 @@
         return targetUrl;
     }
 
+    function describeNetworkError(prefix, jqXHR, url) {
+        var proxy = Lampa.Storage.get('hdrezka_cors_proxy', '');
+        var status = jqXHR && jqXHR.status ? jqXHR.status : 0;
+        var msg = prefix + '. ';
+        
+        console.error('HDRezka Network Error:', prefix, '| URL:', url, '| Proxy:', proxy, '| Status:', status, '| Response:', jqXHR ? (jqXHR.responseText ? jqXHR.responseText.substring(0, 200) : '') : '');
+        
+        if (status === 0) {
+            if (!proxy && typeof window !== 'undefined' && window.location.protocol.indexOf('http') === 0) {
+                msg += 'CORS-прокси не задан, укажите его в настройках плагина.';
+            } else if (proxy) {
+                msg += 'Ответа нет. Проверьте: работает ли сам прокси, правильный ли формат, не заблокировано ли зеркало провайдером.';
+            } else {
+                msg += 'Сетевая ошибка (CORS или блокировка).';
+            }
+        } else {
+            msg += 'Сервер вернул код ' + status + ' (возможно, бан или капча).';
+        }
+        
+        Lampa.Noty.show(msg);
+    }
+
     function networkRequest(url, type, data, onSuccess, onError) {
         if (typeof Lampa !== 'undefined' && typeof Lampa.Reguest === 'function') {
             var net = new Lampa.Reguest();
@@ -111,7 +133,7 @@
                         this.build();
                     }.bind(this),
                     function (jqXHR) {
-                        Lampa.Noty.show('Ошибка загрузки. Код: ' + (jqXHR && jqXHR.status ? jqXHR.status : 'CORS/Сетевая'));
+                        describeNetworkError('Ошибка загрузки закладок', jqXHR, url);
                         this.empty();
                     }.bind(this)
                 );
@@ -317,11 +339,12 @@
                         Lampa.Noty.show('Не найдено на HDRezka');
                     }
                 } catch (e) {
-                    Lampa.Noty.show('Ошибка поиска: ' + e.message);
+                    console.error("HDRezka Search Error", e);
+                    Lampa.Noty.show('Ошибка обработки поиска');
                 }
             },
             function(jqXHR) {
-                Lampa.Noty.show('Ошибка поиска. Код: ' + (jqXHR && jqXHR.status ? jqXHR.status : 'CORS/Сетевая'));
+                describeNetworkError('Ошибка при поиске', jqXHR, searchUrl);
             }
         );
         } catch (err) {
@@ -347,11 +370,8 @@
 
                     var trashList = getTrashList(html);
                     
-                    var parser = new DOMParser();
-                    var doc = parser.parseFromString(html, 'text/html');
-                    
-                    var translators = [];
                     var transNodes = doc.querySelectorAll('#translators-list li');
+                    var translators = [];
                     transNodes.forEach(function(node) {
                         translators.push({
                             title: node.getAttribute('title') || node.textContent.trim(),
@@ -381,11 +401,12 @@
                         else fetchStream(postId, translators[0].id, null, null, movie, trashList);
                     }
                 } catch (e) {
-                    Lampa.Noty.show('Ошибка стр. фильма: ' + e.message);
+                    console.error("HDRezka Page Parse Error", e);
+                    Lampa.Noty.show('Ошибка парсинга страницы');
                 }
             },
             function(jqXHR) {
-                Lampa.Noty.show('Ошибка получения ID. Код: ' + (jqXHR && jqXHR.status ? jqXHR.status : 'CORS/Сетевая'));
+                describeNetworkError('Ошибка загрузки страницы', jqXHR, url);
             }
         );
     }
@@ -401,50 +422,55 @@
         
         networkRequest(apiUrl, 'POST', data, 
             function (res) {
-                var html = res.episodes || res; // depending on response format
-                var parser = new DOMParser();
-                var doc = parser.parseFromString(html, 'text/html');
-                
-                var seasonsNodes = doc.querySelectorAll('.b-simple_season__item');
-                var seasons = [];
-                seasonsNodes.forEach(function(s) {
-                    seasons.push({
-                        title: 'Сезон ' + s.getAttribute('data-tab_id'),
-                        id: s.getAttribute('data-tab_id')
+                try {
+                    var html = res.episodes || res; // depending on response format
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(html, 'text/html');
+                    
+                    var seasonsNodes = doc.querySelectorAll('.b-simple_season__item');
+                    var seasons = [];
+                    seasonsNodes.forEach(function(s) {
+                        seasons.push({
+                            title: 'Сезон ' + s.getAttribute('data-tab_id'),
+                            id: s.getAttribute('data-tab_id')
+                        });
                     });
-                });
 
-                if (seasons.length > 0) {
-                    Lampa.Select.show({
-                        title: 'Выберите сезон',
-                        items: seasons,
-                        onSelect: function(season) {
-                            var epNodes = doc.querySelectorAll('.b-simple_episode__item[data-season_id="'+season.id+'"]');
-                            var episodes = [];
-                            epNodes.forEach(function(e) {
-                                episodes.push({
-                                    title: 'Эпизод ' + e.getAttribute('data-episode_id'),
-                                    id: e.getAttribute('data-episode_id'),
-                                    season: season.id
+                    if (seasons.length > 0) {
+                        Lampa.Select.show({
+                            title: 'Выберите сезон',
+                            items: seasons,
+                            onSelect: function(season) {
+                                var epNodes = doc.querySelectorAll('.b-simple_episode__item[data-season_id="'+season.id+'"]');
+                                var episodes = [];
+                                epNodes.forEach(function(e) {
+                                    episodes.push({
+                                        title: 'Эпизод ' + e.getAttribute('data-episode_id'),
+                                        id: e.getAttribute('data-episode_id'),
+                                        season: season.id
+                                    });
                                 });
-                            });
-                            Lampa.Select.show({
-                                title: 'Выберите эпизод',
-                                items: episodes,
-                                onSelect: function(episode) {
-                                    fetchStream(postId, translatorId, season.id, episode.id, movie, trashList);
-                                },
-                                onBack: function() { Lampa.Controller.toggle('content'); }
-                            });
-                        },
-                        onBack: function() { Lampa.Controller.toggle('content'); }
-                    });
-                } else {
-                    Lampa.Noty.show('Сезоны не найдены');
+                                Lampa.Select.show({
+                                    title: 'Выберите эпизод',
+                                    items: episodes,
+                                    onSelect: function(episode) {
+                                        fetchStream(postId, translatorId, season.id, episode.id, movie, trashList);
+                                    },
+                                    onBack: function() { Lampa.Controller.toggle('content'); }
+                                });
+                            },
+                            onBack: function() { Lampa.Controller.toggle('content'); }
+                        });
+                    } else {
+                        Lampa.Noty.show('Сезоны не найдены');
+                    }
+                } catch(e) {
+                    console.error("HDRezka Episodes Parse Error", e);
+                    Lampa.Noty.show('Ошибка парсинга эпизодов');
                 }
             },
             function (jqXHR) {
-                Lampa.Noty.show('Ошибка загрузки переводов. Код: ' + (jqXHR && jqXHR.status ? jqXHR.status : 'CORS/Сетевая'));
+                describeNetworkError('Ошибка загрузки эпизодов', jqXHR, apiUrl);
             }
         );
     }
@@ -467,45 +493,36 @@
 
         networkRequest(apiUrl, 'POST', data, 
             function (res) {
-                if (res && res.url) {
-                    var decoded = decodeUrl(res.url, trashList);
-                    var streams = parseStreams(decoded);
-                    if (streams.length > 0) {
-                        // Usually Lampa Player takes an object with url
-                        // We will play the highest quality or first by default, 
-                        // or better: let the user select quality if we mapped them to Lampa playlist format.
-                        
-                        var playlist = [];
-                        streams.forEach(function(s) {
-                            playlist.push({
-                                title: movie.title + ' (' + s.title + ')',
-                                url: s.url
+                try {
+                    if (res && res.url) {
+                        var decoded = decodeUrl(res.url, trashList);
+                        var streams = parseStreams(decoded);
+                        if (streams.length > 0) {
+                            var videoItem = {
+                                title: movie.title,
+                                url: streams[streams.length - 1].url, // last is usually highest
+                                quality: {}
+                            };
+                            
+                            streams.forEach(function(s) {
+                                videoItem.quality[s.title] = s.url;
                             });
-                        });
-                        
-                        // Just play the best (last) or show quality selector
-                        // Lampa.Player.play requires a single file or playlist.
-                        var videoItem = {
-                            title: movie.title,
-                            url: streams[streams.length - 1].url, // last is usually highest
-                            quality: {}
-                        };
-                        
-                        streams.forEach(function(s) {
-                            videoItem.quality[s.title] = s.url;
-                        });
 
-                        Lampa.Player.playlist([videoItem]);
-                        Lampa.Player.play(videoItem);
+                            Lampa.Player.playlist([videoItem]);
+                            Lampa.Player.play(videoItem);
+                        } else {
+                            Lampa.Noty.show('Не удалось разобрать ссылки на видео');
+                        }
                     } else {
-                        Lampa.Noty.show('Не удалось разобрать ссылки на видео');
+                        Lampa.Noty.show('Видео не найдено');
                     }
-                } else {
-                    Lampa.Noty.show('Видео не найдено');
+                } catch(e) {
+                    console.error("HDRezka Stream Parse Error", e);
+                    Lampa.Noty.show('Ошибка парсинга потока');
                 }
             },
             function (jqXHR) {
-                Lampa.Noty.show('Ошибка загрузки потока. Код: ' + (jqXHR && jqXHR.status ? jqXHR.status : 'CORS/Сетевая'));
+                describeNetworkError('Ошибка получения видео', jqXHR, apiUrl);
             }
         );
     }
