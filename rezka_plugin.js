@@ -76,6 +76,9 @@
                 $.ajax({
                     url: url,
                     type: 'GET',
+                    xhrFields: {
+                        withCredentials: true
+                    },
                     headers: getHeaders(),
                     success: function (result) {
                         this.parseHTML(result);
@@ -248,17 +251,18 @@
             var searchUrl = buildRequestUrl('/index.php?do=search&subaction=search&q=' + encodeURIComponent(title));
             
             Lampa.Noty.show('Поиск на HDRezka: ' + title);
-
         $.ajax({
             url: searchUrl,
             type: 'GET',
+            xhrFields: {
+                withCredentials: true
+            },
             headers: getHeaders(),
             success: function(html) {
                 try {
                     var parser = new DOMParser();
                     var doc = parser.parseFromString(html, 'text/html');
                     var items = doc.querySelectorAll('.b-content__inline_item');
-                    
                     var bestMatch = null;
                     items.forEach(function(item) {
                         var linkEl = item.querySelector('.b-content__inline_item-link a');
@@ -301,6 +305,9 @@
         $.ajax({
             url: url,
             type: 'GET',
+            xhrFields: {
+                withCredentials: true
+            },
             headers: getHeaders(),
             success: function(html) {
                 try {
@@ -376,6 +383,9 @@
         $.ajax({
             url: apiUrl,
             type: 'POST',
+            xhrFields: {
+                withCredentials: true
+            },
             data: data,
             headers: getHeaders(),
             success: function (res) {
@@ -448,6 +458,9 @@
         $.ajax({
             url: apiUrl,
             type: 'POST',
+            xhrFields: {
+                withCredentials: true
+            },
             data: data,
             headers: getHeaders(),
             success: function (res) {
