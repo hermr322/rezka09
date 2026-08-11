@@ -15,29 +15,31 @@
             });
         }
 
-        Lampa.SettingsApi.addParam({
-            component: componentId,
-            param: { name: 'hdrezka_mirror', type: 'input', default: 'https://rezka.ag' },
-            field: { name: 'Зеркало HDRezka', description: 'Адрес рабочего зеркала (например: https://rezka.ag)' }
-        });
+        function addTextField(name, title, desc, defaultValue) {
+            Lampa.SettingsApi.addParam({
+                component: componentId,
+                param: { name: name, type: 'button' },
+                field: { name: title, description: Lampa.Storage.get(name, defaultValue) || desc },
+                onRender: function (item) {
+                    item.on('hover:enter', function () {
+                        Lampa.Input.edit({
+                            title: title,
+                            value: Lampa.Storage.get(name, defaultValue),
+                            free: true,
+                            nosave: true
+                        }, function (new_val) {
+                            Lampa.Storage.set(name, new_val);
+                            item.find('.settings-param__desr').text(new_val || desc);
+                        });
+                    });
+                }
+            });
+        }
 
-        Lampa.SettingsApi.addParam({
-            component: componentId,
-            param: { name: 'hdrezka_user_id', type: 'input', default: '' },
-            field: { name: 'ID Пользователя (dle_user_id)', description: 'Из cookies сайта' }
-        });
-
-        Lampa.SettingsApi.addParam({
-            component: componentId,
-            param: { name: 'hdrezka_password', type: 'input', default: '' },
-            field: { name: 'Хэш пароля (dle_password)', description: 'Из cookies сайта' }
-        });
-        
-        Lampa.SettingsApi.addParam({
-            component: componentId,
-            param: { name: 'hdrezka_cors_proxy', type: 'input', default: 'https://corsproxy.io/?' },
-            field: { name: 'CORS Прокси', description: 'Прокси для обхода блокировок браузера' }
-        });
+        addTextField('hdrezka_mirror', 'Зеркало HDRezka', 'Нажмите для ввода (по умолчанию https://rezka.ag)', 'https://rezka.ag');
+        addTextField('hdrezka_user_id', 'ID Пользователя (dle_user_id)', 'Нажмите для ввода (из cookies сайта)', '');
+        addTextField('hdrezka_password', 'Хэш пароля (dle_password)', 'Нажмите для ввода (из cookies сайта)', '');
+        addTextField('hdrezka_cors_proxy', 'CORS Прокси', 'Нажмите для ввода', 'https://corsproxy.io/?');
     }
 
     function buildRequestUrl(path) {
