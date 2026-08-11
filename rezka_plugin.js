@@ -39,12 +39,12 @@
         addTextField('hdrezka_mirror', 'Зеркало HDRezka', 'Нажмите для ввода (по умолчанию https://rezka.ag)', 'https://rezka.ag');
         addTextField('hdrezka_user_id', 'ID Пользователя (dle_user_id)', 'Нажмите для ввода (из cookies сайта)', '');
         addTextField('hdrezka_password', 'Хэш пароля (dle_password)', 'Нажмите для ввода (из cookies сайта)', '');
-        addTextField('hdrezka_cors_proxy', 'CORS Прокси', 'Нажмите для ввода', 'https://corsproxy.io/?');
+        addTextField('hdrezka_cors_proxy', 'CORS Прокси', 'Нажмите для ввода', '');
     }
 
     function buildRequestUrl(path) {
         var mirror = Lampa.Storage.get('hdrezka_mirror', 'https://rezka.ag');
-        var proxy = Lampa.Storage.get('hdrezka_cors_proxy', 'https://corsproxy.io/?');
+        var proxy = Lampa.Storage.get('hdrezka_cors_proxy', '');
         if (mirror && mirror.charAt(mirror.length - 1) === '/') mirror = mirror.slice(0, -1);
         var targetUrl = (path.indexOf('http') === 0) ? path : (mirror + (path.indexOf('/') === 0 ? path : '/' + path));
         if (proxy) return proxy + encodeURIComponent(targetUrl);
@@ -81,8 +81,8 @@
                         this.parseHTML(result);
                         this.build();
                     }.bind(this),
-                    error: function () {
-                        Lampa.Noty.show('Ошибка загрузки закладок HDRezka');
+                    error: function (jqXHR) {
+                        Lampa.Noty.show('Ошибка закладок. Код: ' + (jqXHR.status || 'CORS/Сетевая'));
                         this.empty();
                     }.bind(this)
                 });
@@ -286,8 +286,8 @@
                     Lampa.Noty.show('Ошибка поиска: ' + e.message);
                 }
             },
-            error: function() {
-                Lampa.Noty.show('Ошибка поиска HDRezka');
+            error: function(jqXHR) {
+                Lampa.Noty.show('Ошибка поиска. Код: ' + (jqXHR.status || 'CORS/Сетевая'));
             }
         });
         } catch (err) {
@@ -353,8 +353,8 @@
                     Lampa.Noty.show('Ошибка стр. фильма: ' + e.message);
                 }
             },
-            error: function() {
-                Lampa.Noty.show('Ошибка загрузки страницы');
+            error: function(jqXHR) {
+                Lampa.Noty.show('Ошибка страницы. Код: ' + (jqXHR.status || 'CORS/Сетевая'));
             }
         });
     }
@@ -363,7 +363,7 @@
         Lampa.Noty.show('Загрузка эпизодов...');
         
         var mirror = Lampa.Storage.get('hdrezka_mirror', 'https://rezka.ag');
-        var proxy = Lampa.Storage.get('hdrezka_cors_proxy', 'https://corsproxy.io/?');
+        var proxy = Lampa.Storage.get('hdrezka_cors_proxy', '');
         if (mirror && mirror.charAt(mirror.length - 1) === '/') mirror = mirror.slice(0, -1);
         
         var apiUrl = mirror + '/ajax/get_episodes/';
@@ -421,8 +421,8 @@
                     Lampa.Noty.show('Сезоны не найдены');
                 }
             },
-            error: function () {
-                Lampa.Noty.show('Ошибка получения эпизодов');
+            error: function (jqXHR) {
+                Lampa.Noty.show('Ошибка эпизодов. Код: ' + (jqXHR.status || 'CORS/Сетевая'));
             }
         });
     }
@@ -435,7 +435,7 @@
         var endpoint = isSeries ? '/ajax/get_cdn_series/' : '/ajax/get_play_video/';
         
         var mirror = Lampa.Storage.get('hdrezka_mirror', 'https://rezka.ag');
-        var proxy = Lampa.Storage.get('hdrezka_cors_proxy', 'https://corsproxy.io/?');
+        var proxy = Lampa.Storage.get('hdrezka_cors_proxy', '');
         if (mirror && mirror.charAt(mirror.length - 1) === '/') mirror = mirror.slice(0, -1);
         var apiUrl = mirror + endpoint;
         if (proxy) apiUrl = proxy + encodeURIComponent(apiUrl);
@@ -488,8 +488,8 @@
                     Lampa.Noty.show('Видео не найдено');
                 }
             },
-            error: function () {
-                Lampa.Noty.show('Ошибка получения видео');
+            error: function (jqXHR) {
+                Lampa.Noty.show('Ошибка видео. Код: ' + (jqXHR.status || 'CORS/Сетевая'));
             }
         });
     }
