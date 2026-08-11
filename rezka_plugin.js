@@ -70,39 +70,26 @@
         return targetUrl;
     }
 
-    function getHeaders() {
-        var userId = Lampa.Storage.get('hdrezka_user_id', '');
-        var userPass = Lampa.Storage.get('hdrezka_password', '');
-        var headers = {};
-        if (userId && userPass) {
-            headers['Cookie'] = 'dle_user_id=' + userId + '; dle_password=' + userPass + ';';
-        }
-        return headers;
-    }
-
-    function networkRequest(url, type, data, headers, onSuccess, onError) {
-        var options = {
-            headers: headers
-        };
-        if (type === 'POST') {
-            options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
-        }
+    function networkRequest(url, type, data, onSuccess, onError) {
         if (typeof Lampa !== 'undefined' && typeof Lampa.Reguest === 'function') {
             var net = new Lampa.Reguest();
             if (type === 'POST') {
-                net.silent(url, onSuccess, onError, data, options);
+                net.silent(url, onSuccess, onError, data);
             } else {
-                net.silent(url, onSuccess, onError, false, options);
+                net.silent(url, onSuccess, onError);
             }
         } else {
-            $.ajax({
+            var ajaxOpts = {
                 url: url,
                 type: type,
-                data: data,
-                headers: headers,
                 success: onSuccess,
                 error: onError
-            });
+            };
+            if (type === 'POST') {
+                ajaxOpts.data = data;
+                ajaxOpts.contentType = 'application/x-www-form-urlencoded';
+            }
+            $.ajax(ajaxOpts);
         }
     }
 
@@ -118,7 +105,7 @@
                 this.activity.loader(true);
                 var url = buildRequestUrl('/favorites/');
 
-                networkRequest(url, 'GET', null, getHeaders(), 
+                networkRequest(url, 'GET', null, 
                     function (result) {
                         this.parseHTML(result);
                         this.build();
@@ -298,7 +285,7 @@
             var searchUrl = buildRequestUrl('/index.php?do=search&subaction=search&q=' + encodeURIComponent(title));
             
             Lampa.Noty.show('Поиск на HDRezka: ' + title);
-        networkRequest(searchUrl, 'GET', null, getHeaders(), 
+        networkRequest(searchUrl, 'GET', null, 
             function(html) {
                 try {
                     var parser = new DOMParser();
@@ -345,7 +332,7 @@
     function loadMoviePage(href, movie) {
         Lampa.Noty.show('Загрузка данных...');
         var url = buildRequestUrl(href);
-        networkRequest(url, 'GET', null, getHeaders(), 
+        networkRequest(url, 'GET', null, 
             function(html) {
                 try {
                     var parser = new DOMParser();
@@ -412,7 +399,7 @@
         var data = 'id=' + postId + '&action=get_episodes';
         if (translatorId !== 'default') data += '&translator_id=' + translatorId;
         
-        networkRequest(apiUrl, 'POST', data, getHeaders(), 
+        networkRequest(apiUrl, 'POST', data, 
             function (res) {
                 var html = res.episodes || res; // depending on response format
                 var parser = new DOMParser();
@@ -478,7 +465,7 @@
             data += '&season=' + season + '&episode=' + episode;
         }
 
-        networkRequest(apiUrl, 'POST', data, getHeaders(), 
+        networkRequest(apiUrl, 'POST', data, 
             function (res) {
                 if (res && res.url) {
                     var decoded = decodeUrl(res.url, trashList);
