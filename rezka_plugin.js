@@ -38,7 +38,26 @@
 
         addTextField('hdrezka_mirror', 'Зеркало HDRezka', 'Нажмите для ввода (по умолчанию https://rezka.ag)', 'https://rezka.ag');
         addTextField('hdrezka_user_id', 'ID Пользователя (dle_user_id)', 'Нажмите для ввода (из cookies сайта)', '');
-        addTextField('hdrezka_password', 'Хэш пароля (dle_password)', 'Нажмите для ввода (из cookies сайта)', '');
+        
+        Lampa.SettingsApi.addParam({
+            component: componentId,
+            param: { name: 'hdrezka_password', type: 'title' },
+            field: { name: 'Хэш пароля (dle_password)', description: Lampa.Storage.get('hdrezka_password') ? '********' : 'Нажмите для ввода (из cookies сайта)' },
+            onRender: function (item) {
+                item.on('hover:enter click', function () {
+                    Lampa.Input.edit({
+                        title: 'Хэш пароля (dle_password)',
+                        value: Lampa.Storage.get('hdrezka_password', ''),
+                        free: true,
+                        nosave: true
+                    }, function (new_val) {
+                        Lampa.Storage.set('hdrezka_password', new_val);
+                        item.find('.settings-param__desr').text(new_val ? '********' : 'Нажмите для ввода (из cookies сайта)');
+                    });
+                });
+            }
+        });
+
         addTextField('hdrezka_cors_proxy', 'CORS Прокси', 'Нажмите для ввода', '');
     }
 
@@ -65,6 +84,9 @@
         var options = {
             headers: headers
         };
+        if (type === 'POST') {
+            options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+        }
         if (typeof Lampa !== 'undefined' && typeof Lampa.Reguest === 'function') {
             var net = new Lampa.Reguest();
             if (type === 'POST') {
@@ -225,8 +247,11 @@
 
     function decodeUrl(encodedStr, trashList) {
         var str = encodedStr;
-        if (str.indexOf('#h') === 0) {
-            str = str.substring(2);
+        // Check if string contains typical base64 characters and might be encoded
+        if (str.indexOf('#h') === 0 || str.match(/(_|X|\/|\\|!|\^|b|@)/)) {
+            if (str.indexOf('#h') === 0) {
+                str = str.substring(2);
+            }
             trashList.forEach(function(trash) {
                 str = str.split(trash).join('');
             });
@@ -246,9 +271,14 @@
         parts.forEach(function(part) {
             var match = part.match(/\[([^\]]+)\](.*)/);
             if (match) {
+                var url = match[2].trim();
+                // Handle multiple mirrors in same quality like: url1 or url2
+                if (url.indexOf(' or ') !== -1) {
+                    url = url.split(' or ')[0].trim();
+                }
                 streams.push({
                     title: match[1],
-                    url: match[2].trim()
+                    url: url
                 });
             } else if (part.trim().indexOf('http') === 0) {
                 streams.push({
@@ -279,14 +309,16 @@
                         var linkEl = item.querySelector('.b-content__inline_item-link a');
                         var infoEl = item.querySelector('.b-content__inline_item-link div');
                         if (linkEl) {
-                            var itemTitle = linkEl.textContent.trim();
+                            var itemTitle = linkEl.textContent.trim().toLowerCase();
                             var itemInfo = infoEl ? infoEl.textContent : '';
                             var itemYearMatch = itemInfo.match(/\d{4}/);
                             var itemYear = itemYearMatch ? itemYearMatch[0] : '';
                             
-                            // Simple heuristic: year match is very strong
-                            if (!bestMatch) bestMatch = linkEl.getAttribute('href');
-                            if (year && itemYear === year) {
+                            // Compare normalized title and year
+                            var titleMatch = itemTitle === title.toLowerCase();
+                            
+                            if (titleMatch && !bestMatch) bestMatch = linkEl.getAttribute('href');
+                            if (year && itemYear === year && titleMatch) {
                                 bestMatch = linkEl.getAttribute('href');
                             }
                         }
@@ -316,8 +348,11 @@
         networkRequest(url, 'GET', null, getHeaders(), 
             function(html) {
                 try {
-                    var matchId = html.match(/id="post_id"\s*name="post_id"\s*value="(\d+)"/);
-                    var postId = matchId ? matchId[1] : null;
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(html, 'text/html');
+                    
+                    var postInput = doc.querySelector('#post_id');
+                    var postId = postInput ? postInput.value : null;
                     if (!postId) {
                         Lampa.Noty.show('Ошибка парсинга ID');
                         return;
@@ -339,13 +374,10 @@
                     });
 
                     if (translators.length === 0) {
-                        // Check if single default translator exists in init
-                        var defTransMatch = html.match(/sof\.tv\.init\(\{.*"translator_id":(\d+)/);
-                        var transId = defTransMatch ? defTransMatch[1] : null;
-                        translators.push({ title: 'По умолчанию', id: transId || 'default' });
+                        translators.push({ title: 'По умолчанию', id: 'default' });
                     }
 
-                    var isSeries = html.indexOf('data-season_id') !== -1 || html.indexOf('b-simple_season__item') !== -1;
+                    var isSeries = doc.querySelector('[data-season_id]') || doc.querySelector('.b-simple_season__item');
 
                     if (translators.length > 1) {
                         Lampa.Select.show({
@@ -374,14 +406,11 @@
     function loadSeries(postId, translatorId, movie, trashList) {
         Lampa.Noty.show('Загрузка эпизодов...');
         
-        var mirror = Lampa.Storage.get('hdrezka_mirror', 'https://rezka.ag');
-        var proxy = Lampa.Storage.get('hdrezka_cors_proxy', '');
-        if (mirror && mirror.charAt(mirror.length - 1) === '/') mirror = mirror.slice(0, -1);
+        var apiUrl = buildRequestUrl('/ajax/get_episodes/');
         
-        var apiUrl = mirror + '/ajax/get_episodes/';
-        if (proxy) apiUrl = proxy + encodeURIComponent(apiUrl);
-
-        var data = 'id=' + postId + '&translator_id=' + translatorId + '&action=get_episodes';
+        // If translator is default, don't pass it so server uses default
+        var data = 'id=' + postId + '&action=get_episodes';
+        if (translatorId !== 'default') data += '&translator_id=' + translatorId;
         
         networkRequest(apiUrl, 'POST', data, getHeaders(), 
             function (res) {
@@ -437,16 +466,14 @@
         Lampa.Noty.show('Получение видео...');
         
         var isSeries = (season && episode);
-        var action = isSeries ? 'get_episodes' : 'get_movie';
+        var action = isSeries ? 'get_stream' : 'get_movie';
         var endpoint = isSeries ? '/ajax/get_cdn_series/' : '/ajax/get_play_video/';
         
-        var mirror = Lampa.Storage.get('hdrezka_mirror', 'https://rezka.ag');
-        var proxy = Lampa.Storage.get('hdrezka_cors_proxy', '');
-        if (mirror && mirror.charAt(mirror.length - 1) === '/') mirror = mirror.slice(0, -1);
-        var apiUrl = mirror + endpoint;
-        if (proxy) apiUrl = proxy + encodeURIComponent(apiUrl);
+        var apiUrl = buildRequestUrl(endpoint);
 
-        var data = 'id=' + postId + '&translator_id=' + translatorId + '&action=' + action;
+        var data = 'id=' + postId + '&action=' + action;
+        if (translatorId !== 'default') data += '&translator_id=' + translatorId;
+        
         if (isSeries) {
             data += '&season=' + season + '&episode=' + episode;
         }
@@ -481,8 +508,8 @@
                             videoItem.quality[s.title] = s.url;
                         });
 
-                        Lampa.Player.play(videoItem);
                         Lampa.Player.playlist([videoItem]);
+                        Lampa.Player.play(videoItem);
                     } else {
                         Lampa.Noty.show('Не удалось разобрать ссылки на видео');
                     }
