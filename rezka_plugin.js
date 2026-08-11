@@ -45,8 +45,8 @@
     function buildRequestUrl(path) {
         var mirror = Lampa.Storage.get('hdrezka_mirror', 'https://rezka.ag');
         var proxy = Lampa.Storage.get('hdrezka_cors_proxy', 'https://corsproxy.io/?');
-        if (mirror.endsWith('/')) mirror = mirror.slice(0, -1);
-        var targetUrl = path.startsWith('http') ? path : (mirror + (path.startsWith('/') ? path : '/' + path));
+        if (mirror && mirror.charAt(mirror.length - 1) === '/') mirror = mirror.slice(0, -1);
+        var targetUrl = (path.indexOf('http') === 0) ? path : (mirror + (path.indexOf('/') === 0 ? path : '/' + path));
         if (proxy) return proxy + encodeURIComponent(targetUrl);
         return targetUrl;
     }
@@ -199,7 +199,7 @@
 
     function decodeUrl(encodedStr, trashList) {
         var str = encodedStr;
-        if (str.startsWith('#h')) {
+        if (str.indexOf('#h') === 0) {
             str = str.substring(2);
             trashList.forEach(function(trash) {
                 str = str.split(trash).join('');
@@ -224,7 +224,7 @@
                     title: match[1],
                     url: match[2].trim()
                 });
-            } else if (part.trim().startsWith('http')) {
+            } else if (part.trim().indexOf('http') === 0) {
                 streams.push({
                     title: 'Auto',
                     url: part.trim()
@@ -333,7 +333,7 @@
         
         var mirror = Lampa.Storage.get('hdrezka_mirror', 'https://rezka.ag');
         var proxy = Lampa.Storage.get('hdrezka_cors_proxy', 'https://corsproxy.io/?');
-        if (mirror.endsWith('/')) mirror = mirror.slice(0, -1);
+        if (mirror && mirror.charAt(mirror.length - 1) === '/') mirror = mirror.slice(0, -1);
         
         var apiUrl = mirror + '/ajax/get_episodes/';
         if (proxy) apiUrl = proxy + encodeURIComponent(apiUrl);
@@ -405,7 +405,7 @@
         
         var mirror = Lampa.Storage.get('hdrezka_mirror', 'https://rezka.ag');
         var proxy = Lampa.Storage.get('hdrezka_cors_proxy', 'https://corsproxy.io/?');
-        if (mirror.endsWith('/')) mirror = mirror.slice(0, -1);
+        if (mirror && mirror.charAt(mirror.length - 1) === '/') mirror = mirror.slice(0, -1);
         var apiUrl = mirror + endpoint;
         if (proxy) apiUrl = proxy + encodeURIComponent(apiUrl);
 
