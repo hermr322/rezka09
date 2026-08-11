@@ -490,10 +490,10 @@
                     Lampa.Noty.show('Видео не найдено');
                 }
             },
-            error: function (jqXHR) {
-                Lampa.Noty.show('Ошибка видео. Код: ' + (jqXHR.status || 'CORS/Сетевая'));
+            function (jqXHR) {
+                Lampa.Noty.show('Ошибка загрузки потока. Код: ' + (jqXHR && jqXHR.status ? jqXHR.status : 'CORS/Сетевая'));
             }
-        });
+        );
     }
 
     // Hook into full card
