@@ -21,7 +21,7 @@
                 param: { name: name, type: 'title' },
                 field: { name: title, description: Lampa.Storage.get(name, defaultValue) || desc },
                 onRender: function (item) {
-                    item.on('hover:enter', function () {
+                    item.on('hover:enter click', function () {
                         Lampa.Input.edit({
                             title: title,
                             value: Lampa.Storage.get(name, defaultValue),
