@@ -235,39 +235,45 @@
     }
 
     function openRezkaBalancer(movie) {
-        var title = movie.original_title || movie.title;
-        var year = movie.release_date ? movie.release_date.substring(0, 4) : '';
-        var searchUrl = buildRequestUrl('/search/?do=search&subaction=search&q=' + encodeURIComponent(title));
-        
-        Lampa.Noty.show('Поиск на HDRezka...');
+        try {
+            var title = movie.original_title || movie.title || movie.original_name || movie.name;
+            var releaseDate = movie.release_date || movie.first_air_date;
+            var year = releaseDate ? releaseDate.substring(0, 4) : '';
+            var searchUrl = buildRequestUrl('/search/?do=search&subaction=search&q=' + encodeURIComponent(title));
+            
+            Lampa.Noty.show('Поиск на HDRezka: ' + title);
 
         Lampa.network.request(searchUrl, function(html) {
-            var parser = new DOMParser();
-            var doc = parser.parseFromString(html, 'text/html');
-            var items = doc.querySelectorAll('.b-content__inline_item');
-            
-            var bestMatch = null;
-            items.forEach(function(item) {
-                var linkEl = item.querySelector('.b-content__inline_item-link a');
-                var infoEl = item.querySelector('.b-content__inline_item-link div');
-                if (linkEl) {
-                    var itemTitle = linkEl.textContent.trim();
-                    var itemInfo = infoEl ? infoEl.textContent : '';
-                    var itemYearMatch = itemInfo.match(/\d{4}/);
-                    var itemYear = itemYearMatch ? itemYearMatch[0] : '';
-                    
-                    // Simple heuristic: year match is very strong
-                    if (!bestMatch) bestMatch = linkEl.getAttribute('href');
-                    if (year && itemYear === year) {
-                        bestMatch = linkEl.getAttribute('href');
+            try {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, 'text/html');
+                var items = doc.querySelectorAll('.b-content__inline_item');
+                
+                var bestMatch = null;
+                items.forEach(function(item) {
+                    var linkEl = item.querySelector('.b-content__inline_item-link a');
+                    var infoEl = item.querySelector('.b-content__inline_item-link div');
+                    if (linkEl) {
+                        var itemTitle = linkEl.textContent.trim();
+                        var itemInfo = infoEl ? infoEl.textContent : '';
+                        var itemYearMatch = itemInfo.match(/\d{4}/);
+                        var itemYear = itemYearMatch ? itemYearMatch[0] : '';
+                        
+                        // Simple heuristic: year match is very strong
+                        if (!bestMatch) bestMatch = linkEl.getAttribute('href');
+                        if (year && itemYear === year) {
+                            bestMatch = linkEl.getAttribute('href');
+                        }
                     }
-                }
-            });
+                });
 
-            if (bestMatch) {
-                loadMoviePage(bestMatch, movie);
-            } else {
-                Lampa.Noty.show('Не найдено на HDRezka');
+                if (bestMatch) {
+                    loadMoviePage(bestMatch, movie);
+                } else {
+                    Lampa.Noty.show('Не найдено на HDRezka');
+                }
+            } catch (e) {
+                Lampa.Noty.show('Ошибка поиска: ' + e.message);
             }
         }, function() {
             Lampa.Noty.show('Ошибка поиска HDRezka');
@@ -278,50 +284,54 @@
         Lampa.Noty.show('Загрузка данных...');
         var url = buildRequestUrl(href);
         Lampa.network.request(url, function(html) {
-            var matchId = html.match(/id="post_id"\s*name="post_id"\s*value="(\d+)"/);
-            var postId = matchId ? matchId[1] : null;
-            if (!postId) {
-                Lampa.Noty.show('Ошибка парсинга ID');
-                return;
-            }
+            try {
+                var matchId = html.match(/id="post_id"\s*name="post_id"\s*value="(\d+)"/);
+                var postId = matchId ? matchId[1] : null;
+                if (!postId) {
+                    Lampa.Noty.show('Ошибка парсинга ID');
+                    return;
+                }
 
-            var trashList = getTrashList(html);
-            
-            var parser = new DOMParser();
-            var doc = parser.parseFromString(html, 'text/html');
-            
-            var translators = [];
-            var transNodes = doc.querySelectorAll('#translators-list li');
-            transNodes.forEach(function(node) {
-                translators.push({
-                    title: node.getAttribute('title') || node.textContent.trim(),
-                    id: node.getAttribute('data-translator_id'),
-                    selected: node.classList.contains('active')
+                var trashList = getTrashList(html);
+                
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, 'text/html');
+                
+                var translators = [];
+                var transNodes = doc.querySelectorAll('#translators-list li');
+                transNodes.forEach(function(node) {
+                    translators.push({
+                        title: node.getAttribute('title') || node.textContent.trim(),
+                        id: node.getAttribute('data-translator_id'),
+                        selected: node.classList.contains('active')
+                    });
                 });
-            });
 
-            if (translators.length === 0) {
-                // Check if single default translator exists in init
-                var defTransMatch = html.match(/sof\.tv\.init\(\{.*"translator_id":(\d+)/);
-                var transId = defTransMatch ? defTransMatch[1] : null;
-                translators.push({ title: 'По умолчанию', id: transId || 'default' });
-            }
+                if (translators.length === 0) {
+                    // Check if single default translator exists in init
+                    var defTransMatch = html.match(/sof\.tv\.init\(\{.*"translator_id":(\d+)/);
+                    var transId = defTransMatch ? defTransMatch[1] : null;
+                    translators.push({ title: 'По умолчанию', id: transId || 'default' });
+                }
 
-            var isSeries = html.indexOf('data-season_id') !== -1 || html.indexOf('b-simple_season__item') !== -1;
+                var isSeries = html.indexOf('data-season_id') !== -1 || html.indexOf('b-simple_season__item') !== -1;
 
-            if (translators.length > 1) {
-                Lampa.Select.show({
-                    title: 'Выберите озвучку',
-                    items: translators,
-                    onSelect: function(t) {
-                        if (isSeries) loadSeries(postId, t.id, movie, trashList);
-                        else fetchStream(postId, t.id, null, null, movie, trashList);
-                    },
-                    onBack: function() { Lampa.Controller.toggle('content'); }
-                });
-            } else {
-                if (isSeries) loadSeries(postId, translators[0].id, movie, trashList);
-                else fetchStream(postId, translators[0].id, null, null, movie, trashList);
+                if (translators.length > 1) {
+                    Lampa.Select.show({
+                        title: 'Выберите озвучку',
+                        items: translators,
+                        onSelect: function(t) {
+                            if (isSeries) loadSeries(postId, t.id, movie, trashList);
+                            else fetchStream(postId, t.id, null, null, movie, trashList);
+                        },
+                        onBack: function() { Lampa.Controller.toggle('content'); }
+                    });
+                } else {
+                    if (isSeries) loadSeries(postId, translators[0].id, movie, trashList);
+                    else fetchStream(postId, translators[0].id, null, null, movie, trashList);
+                }
+            } catch (e) {
+                Lampa.Noty.show('Ошибка стр. фильма: ' + e.message);
             }
         }, function() {
             Lampa.Noty.show('Ошибка загрузки страницы');
@@ -468,8 +478,12 @@
         Lampa.Listener.follow('full', function (e) {
             if (e.type === 'complite') {
                 var btn = $('<div class="full-start__button selector button--hdrezka" style="background-color: #d12e2e; border-radius: 30px; display: inline-flex; align-items: center; justify-content: center; padding: 10px 20px; margin: 10px 10px 10px 0;"><div class="full-start__button-icon" style="margin-right: 10px; width: 24px; height: 24px;"><svg viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div><div class="full-start__button-text" style="color: white; font-weight: bold;">Смотреть (HDRezka)</div></div>');
-                btn.on('hover:enter', function () {
-                    openRezkaBalancer(e.data.movie);
+                btn.on('hover:enter click', function () {
+                    try {
+                        openRezkaBalancer(e.data.movie);
+                    } catch (err) {
+                        Lampa.Noty.show('Ошибка кнопки: ' + err.message);
+                    }
                 });
                 
                 var render = e.object.activity.render();
