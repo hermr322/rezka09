@@ -18,7 +18,7 @@
         function addTextField(name, title, desc, defaultValue) {
             Lampa.SettingsApi.addParam({
                 component: componentId,
-                param: { name: name, type: 'button' },
+                param: { name: name, type: 'title' },
                 field: { name: title, description: Lampa.Storage.get(name, defaultValue) || desc },
                 onRender: function (item) {
                     item.on('hover:enter', function () {
