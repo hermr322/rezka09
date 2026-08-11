@@ -278,6 +278,9 @@
         }, function() {
             Lampa.Noty.show('Ошибка поиска HDRezka');
         }, false, { headers: getHeaders() });
+        } catch (err) {
+            Lampa.Noty.show('Ошибка поиска (общ): ' + err.message);
+        }
     }
 
     function loadMoviePage(href, movie) {
